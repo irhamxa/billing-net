@@ -13,4 +13,159 @@ HEADER_PAKET = ("id_paket", "nama_paket", "harga")
 HEADER_PELANGGAN = ("id_pelanggan", "username", "password", "nama",
                     "alamat", "no_hp", "id_paket", "tanggal_daftar")
 HEADER_PEMBAYARAN = ("id_tagihan", "id_pelanggan", "bulan", "tahun",
-                     "id_paket", "nominal", "status", "tanggal_bayar")
+                     "id_paket", "nominal", "status", "tanggal_b"
+                     "ayar")
+# buat file kalau belum ada
+def buat_file(namafile, header, isi):
+    if not os.path.exists(namafile):
+        with open(namafile, "w") as file:                 
+            file.write(",".join(header) + "\n")
+        with open(namafile, "a") as file:                 
+            for baris in isi:
+                file.write(baris + "\n")
+
+
+def buat_file_awal():
+    if not os.path.exists(FOLDER):
+        os.makedirs(FOLDER)
+
+
+    admin_awal = ["admin,admin123"]
+    paket_awal = ["PKT01,Paket 10 Mbps,100000",
+                  "PKT02,Paket 20 Mbps,150000",
+                  "PKT03,Paket 30 Mbps,200000"]
+
+    buat_file(FILE_ADMIN, HEADER_ADMIN, admin_awal)
+    buat_file(FILE_PAKET, HEADER_PAKET, paket_awal)
+    buat_file(FILE_PELANGGAN, HEADER_PELANGGAN, [])
+    buat_file(FILE_PEMBAYARAN, HEADER_PEMBAYARAN, [])
+
+#fungsi baca csv jadi dataframe
+def baca(namafile):
+    try:
+        return pd.read_csv(namafile, dtype=str)
+    except FileNotFoundError:
+        print("File tidak ditemukan, membuat ulang file...")
+        buat_file_awal()
+        return pd.read_csv(namafile, dtype=str)
+
+#fungsi simpan df ke csv
+def simpan(df, namafile):
+    df.to_csv(namafile, index=False)
+
+
+
+def garis():
+    print("-" * 70)
+
+
+def judul(teks):
+    print("\n" + "=" * 70)
+    print(teks.center(70))
+    print("=" * 70)
+
+
+def format_rupiah(angka):
+    angka = int(angka)
+    teks = f"{angka:,}".replace(",", ".")
+    return "Rp" + teks
+
+#fungsi pilihan fitur
+def pilih_nomor(pertanyaan, jumlah):
+    pilihan = input(pertanyaan).strip()
+    if pilihan.isdigit() and 1 <= int(pilihan) <= jumlah:
+        return int(pilihan) - 1
+    print("Pilihan tidak valid!")
+    return -1
+
+#fungsi genberate id
+def buat_id(awalan, df, kolom):
+    nomor_max = 0
+    for id_lama in df[kolom]:
+        angka = id_lama[len(awalan):]                     
+        if angka.isdigit() and int(angka) > nomor_max:
+            nomor_max = int(angka)
+    return awalan + str(nomor_max + 1).zfill(2)
+
+#fungsi id pelanggan
+def buat_id_pelanggan(pelanggan):
+    bayar = baca(FILE_PEMBAYARAN)
+    nomor_max = 0
+    for df in (pelanggan, bayar):
+        for id_lama in df["id_pelanggan"]:
+            angka = id_lama[3:]
+            if angka.isdigit() and int(angka) > nomor_max:
+                nomor_max = int(angka)
+    return "PLG" + str(nomor_max + 1).zfill(2)
+
+
+def waktu_sekarang():
+    sekarang = datetime.now()
+    tanggal = sekarang.strftime("%Y-%m-%d")
+    return tanggal, str(sekarang.month), str(sekarang.year)   # tuple
+
+#cari baris pertama yang isinya cocok
+def cari_index(df, kolom, nilai):
+    for i in range(len(df)):
+        if df.iloc[i][kolom] == nilai:
+            return i
+    return -1
+
+#tambah data
+def tambah_baris(df, baris):
+    baru = pd.DataFrame([baris])
+    if len(df) == 0:
+        return baru
+    return pd.concat([df, baru], ignore_index=True)
+
+
+def tampil_paket(paket):
+    garis()
+    print(f"{'No':<4}{'ID':<8}{'Nama Paket':<25}{'Harga/Bulan':<15}")
+    garis()
+    for i in range(len(paket)):
+        print(f"{i + 1:<4}{paket.iloc[i]['id_paket']:<8}"
+              f"{paket.iloc[i]['nama_paket']:<25}"
+              f"{format_rupiah(paket.iloc[i]['harga']):<15}")
+    garis()
+
+
+def buat_tagihan_bulan_ini(id_pel):
+    tanggal, bulan, tahun = waktu_sekarang()
+    bayar = baca(FILE_PEMBAYARAN)
+
+    for i in range(len(bayar)):
+        if (bayar.iloc[i]["id_pelanggan"] == id_pel and
+                bayar.iloc[i]["bulan"] == bulan and
+                bayar.iloc[i]["tahun"] == tahun):
+            return                                         
+
+    pelanggan = baca(FILE_PELANGGAN)
+    paket = baca(FILE_PAKET)
+    p = cari_index(pelanggan, "id_pelanggan", id_pel)
+    id_paket = pelanggan.iloc[p]["id_paket"]
+    k = cari_index(paket, "id_paket", id_paket)
+    harga = paket.iloc[k]["harga"]
+
+    tagihan = {
+        "id_tagihan": buat_id("TGH", bayar, "id_tagihan"),
+        "id_pelanggan": id_pel,
+        "bulan": bulan,
+        "tahun": tahun,
+        "id_paket": id_paket,
+        "nominal": harga,
+        "status": "Belum Lunas",
+        "tanggal_bayar": "-",
+    }
+    bayar = tambah_baris(bayar, tagihan)
+    simpan(bayar, FILE_PEMBAYARAN)
+
+#hapus data pelanggan
+def hapus_data_pelanggan(id_pel):
+    pelanggan = baca(FILE_PELANGGAN)
+    bayar = baca(FILE_PEMBAYARAN)
+    pelanggan = pelanggan[pelanggan["id_pelanggan"] != id_pel]
+    bayar = bayar[~((bayar["id_pelanggan"] == id_pel) &
+                    (bayar["status"] == "Belum Lunas"))]
+    simpan(pelanggan, FILE_PELANGGAN)
+    simpan(bayar, FILE_PEMBAYARAN)
