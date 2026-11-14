@@ -1,6 +1,5 @@
 import os
-import csv
-import sys
+import pandas as pd
 from datetime import datetime
 
 FOLDER = "data"
