@@ -3,13 +3,15 @@ import csv
 import sys
 from datetime import datetime
 
-folder_utama = os.path.join(os.path.dirname(__file__))
-file_admin = os.path.join(folder_utama, 'admin.csv')
-file_pelanggan = os.path.join(folder_utama, 'pelanggan.csv')
-file_paket = os.path.join(folder_utama, 'paket.csv')
-file_pembayaran = os.path.join(folder_utama, 'pembayaran.csv')
+FOLDER = "data"
+FILE_ADMIN = "data/admin.csv"
+FILE_PAKET = "data/paket.csv"
+FILE_PELANGGAN = "data/pelanggan.csv"
+FILE_PEMBAYARAN = "data/pembayaran.csv"
 
-header_admin = ['username', 'password']
-header_pelanggan = ["id_pelanggan", "username", "password", "nama", "alamat", "no_hp", "id_paket", "tanggal_daftar"]
-header_paket = ['id_paket', 'nama', 'harga']
-header_pembayaran = ['id_pembayaran', 'id_pelanggan','bulan', 'tahun', 'id_paket', 'nominal', 'status', 'tanggal_pembayaran', 'jumlah']
+HEADER_ADMIN = ("username", "password")
+HEADER_PAKET = ("id_paket", "nama_paket", "harga")
+HEADER_PELANGGAN = ("id_pelanggan", "username", "password", "nama",
+                    "alamat", "no_hp", "id_paket", "tanggal_daftar")
+HEADER_PEMBAYARAN = ("id_tagihan", "id_pelanggan", "bulan", "tahun",
+                     "id_paket", "nominal", "status", "tanggal_bayar")
