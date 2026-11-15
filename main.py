@@ -169,3 +169,162 @@ def hapus_data_pelanggan(id_pel):
                     (bayar["status"] == "Belum Lunas"))]
     simpan(pelanggan, FILE_PELANGGAN)
     simpan(bayar, FILE_PEMBAYARAN)
+
+#FITUR PELANGGAN
+
+#regristasi akun dan langganan
+def registrasi():
+    judul("REGISTRASI PELANGGAN BARU")
+    pelanggan = baca(FILE_PELANGGAN)
+    paket = baca(FILE_PAKET)
+
+    if len(paket) == 0:
+        print("Belum ada paket tersedia. Hubungi admin.")
+        return
+
+    while True:
+        username = input("Username: ").lower()
+        if username in pelanggan["username"].values:
+            print("Username sudah dipakai!")
+        else:
+            break
+
+    while True:
+        password = input("Password (min 6 karakter): ")
+        if len(password) >= 6:
+            break
+        print("Password minimal 6 karakter!")
+
+    nama = input("Nama lengkap: ").title()
+    alamat = input("Alamat: ").title()
+
+    while True:
+        no_hp = input("No HP: ")
+        if no_hp.isdigit() and len(no_hp) >= 10:          
+            break
+        print("No HP harus angka dan minimal 10 digit!")
+
+    print("\nPilihan paket:")
+    tampil_paket(paket)
+    nomor = -1
+    while nomor == -1:
+        nomor = pilih_nomor("Pilih nomor paket: ", len(paket))
+
+    id_pel = buat_id_pelanggan(pelanggan)
+    tanggal, bulan, tahun = waktu_sekarang()
+
+
+    data_baru = {
+        "id_pelanggan": id_pel,
+        "username": username,
+        "password": password,
+        "nama": nama,
+        "alamat": alamat,
+        "no_hp": no_hp,
+        "id_paket": paket.iloc[nomor]["id_paket"],
+        "tanggal_daftar": tanggal,
+    }
+    pelanggan = tambah_baris(pelanggan, data_baru)
+    simpan(pelanggan, FILE_PELANGGAN)
+    buat_tagihan_bulan_ini(id_pel)
+
+    print("\nRegistrasi berhasil! ID Anda:", id_pel)
+    print("Tagihan bulan ini sudah dibuat.")
+
+
+#login pelanggan
+def login_pelanggan():
+    judul("LOGIN PELANGGAN")
+    username = input("Username: ").strip().lower()
+    password = input("Password: ").strip()
+    pelanggan = baca(FILE_PELANGGAN)
+
+    for i in range(len(pelanggan)):
+        if (pelanggan.iloc[i]["username"] == username and
+                pelanggan.iloc[i]["password"] == password):
+            print("Login berhasil! Selamat datang,", pelanggan.iloc[i]["nama"])
+            return pelanggan.iloc[i]["id_pelanggan"]
+
+    print("Username atau password salah!")
+    return ""
+
+#fungsi riwayat pembayaran
+def riwayat_pembayaran(id_pel):
+    judul("RIWAYAT PEMBAYARAN")
+    bayar = baca(FILE_PEMBAYARAN)
+    riwayat = bayar[(bayar["id_pelanggan"] == id_pel) & (bayar["status"] == "Lunas")]
+
+    if len(riwayat) == 0:
+        print("Belum ada pembayaran.")
+        return
+
+    print(f"{'ID':<8}{'Periode':<12}{'Nominal':<16}{'Tgl Bayar':<12}")
+    garis()
+    total = 0
+    for i in range(len(riwayat)):
+        periode = riwayat.iloc[i]["bulan"] + "/" + riwayat.iloc[i]["tahun"]
+        nominal = int(riwayat.iloc[i]["nominal"])
+        total = total + nominal
+        print(f"{riwayat.iloc[i]['id_tagihan']:<8}{periode:<12}"
+              f"{format_rupiah(nominal):<16}{riwayat.iloc[i]['tanggal_bayar']:<12}")
+    garis()
+    print("Total dibayar:", format_rupiah(total))
+
+#lihat tagihan pelanggan
+def lihat_tagihan(id_pel):
+    judul("TAGIHAN BELUM LUNAS")
+    bayar = baca(FILE_PEMBAYARAN)
+
+    tagihan = bayar[(bayar["id_pelanggan"] == id_pel) & (bayar["status"] == "Belum Lunas")]
+
+    if len(tagihan) == 0:
+        print("Tidak ada tagihan. Terima kasih!")
+        return
+
+    print(f"{'ID':<8}{'Periode':<12}{'Nominal':<16}{'Status':<12}")
+    garis()
+    for i in range(len(tagihan)):
+        periode = tagihan.iloc[i]["bulan"] + "/" + tagihan.iloc[i]["tahun"]
+        print(f"{tagihan.iloc[i]['id_tagihan']:<8}{periode:<12}"
+              f"{format_rupiah(tagihan.iloc[i]['nominal']):<16}"
+              f"{tagihan.iloc[i]['status']:<12}")
+    garis()
+    total = tagihan["nominal"].astype(int).sum()           
+    print("Total tagihan:", format_rupiah(total))
+
+
+#fungsi bayar tagihan
+def bayar_tagihan(id_pel):
+    judul("BAYAR TAGIHAN")
+    bayar = baca(FILE_PEMBAYARAN)
+
+    daftar = []                                            
+    for i in range(len(bayar)):
+        if bayar.iloc[i]["id_pelanggan"] == id_pel and bayar.iloc[i]["status"] == "Belum Lunas":
+            daftar.append(i)
+
+    if len(daftar) == 0:
+        print("Tidak ada tagihan yang harus dibayar.")
+        return
+
+    for no in range(len(daftar)):
+        i = daftar[no]
+        print(f"[{no + 1}] {bayar.iloc[i]['id_tagihan']} | "
+              f"{bayar.iloc[i]['bulan']}/{bayar.iloc[i]['tahun']} | "
+              f"{format_rupiah(bayar.iloc[i]['nominal'])}")
+
+    nomor = pilih_nomor("Pilih tagihan yang dibayar: ", len(daftar))
+    if nomor == -1:
+        return
+
+    i = daftar[nomor]
+    konfirmasi = input("Yakin bayar? (y/n): ").strip().lower()
+    if konfirmasi != "y":
+        print("Pembayaran dibatalkan.")
+        return
+
+    tanggal, bulan, tahun = waktu_sekarang()
+    bayar.at[i, "status"] = "Lunas"
+    bayar.at[i, "tanggal_bayar"] = tanggal
+    simpan(bayar, FILE_PEMBAYARAN)
+    print("Pembayaran berhasil! Status: Lunas,", tanggal)
