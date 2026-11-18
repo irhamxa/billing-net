@@ -503,3 +503,135 @@ def menu_pelanggan(id_pel):
             aktif = False
         else:
             print("Pilihan tidak valid!")
+
+# FITUR ADMIN
+
+#login admin
+def login_admin():
+    judul("LOGIN ADMIN")
+    username = input("Username: ").strip().lower()
+    password = input("Password: ").strip()
+    admin = baca(FILE_ADMIN)
+
+    for i in range(len(admin)):
+        if admin.iloc[i]["username"] == username and admin.iloc[i]["password"] == password:
+            print("Login admin berhasil!")
+            return username
+
+    print("Username atau password admin salah!")
+    return ""
+
+
+#fungsi ganti password
+def ganti_password_admin(username):
+    judul("GANTI PASSWORD ADMIN")
+    admin = baca(FILE_ADMIN)
+    i = cari_index(admin, "username", username)
+
+    lama = input("Password lama: ").strip().lower()
+    if lama != admin.iloc[i]["password"]:
+        print("Password lama salah!")
+        return
+
+    baru = input("Password baru (min 6 karakter): ").strip()
+    if len(baru) < 6 or baru == lama:
+        print("Password baru minimal 6 karakter dan tidak boleh sama dengan yang lama!")
+        return
+
+    admin.at[i, "password"] = baru
+    simpan(admin, FILE_ADMIN)
+    print("Password admin berhasil diubah!")
+
+#tambah paket
+def tambah_paket():
+    judul("TAMBAH PAKET")
+    paket = baca(FILE_PAKET)
+    nama = input("Nama paket: ").strip().title()
+
+    while True:
+        harga = input("Harga per bulan (angka): ").strip()
+        if harga.isdigit() and int(harga) > 0:
+            break
+        print("Harga harus angka lebih dari 0!")
+
+    id_baru = buat_id("PKT", paket, "id_paket")
+    paket = tambah_baris(paket, {"id_paket": id_baru, "nama_paket": nama,
+                                 "harga": str(int(harga))})
+    simpan(paket, FILE_PAKET)
+    print("Paket berhasil ditambahkan dengan ID:", id_baru)
+
+
+#ubah paket
+def ubah_paket():
+    judul("UBAH PAKET")
+    paket = baca(FILE_PAKET)
+    tampil_paket(paket)
+    nomor = pilih_nomor("Pilih nomor paket: ", len(paket))
+    if nomor == -1:
+        return
+
+    print("Kosongkan (Enter) jika tidak ingin mengubah.")
+    nama = input("Nama baru: ").strip()
+    harga = input("Harga baru: ").strip()
+
+    if nama != "":
+        paket.at[nomor, "nama_paket"] = nama.title()
+    if harga != "":
+        if harga.isdigit() and int(harga) > 0:
+            paket.at[nomor, "harga"] = str(int(harga))
+        else:
+            print("Harga tidak valid, harga tidak diubah.")
+
+    simpan(paket, FILE_PAKET)
+    print("Paket berhasil diperbarui!")
+
+
+#hapus paket
+def hapus_paket():
+    judul("HAPUS PAKET")
+    paket = baca(FILE_PAKET)
+    pelanggan = baca(FILE_PELANGGAN)
+    tampil_paket(paket)
+    nomor = pilih_nomor("Pilih nomor paket: ", len(paket))
+    if nomor == -1:
+        return
+
+    id_paket = paket.iloc[nomor]["id_paket"]
+    if id_paket in pelanggan["id_paket"].values:
+        print("Paket tidak bisa dihapus karena masih dipakai pelanggan!")
+        return
+
+    konfirmasi = input("Yakin hapus paket ini? (y/n): ").strip().lower()
+    if konfirmasi != "y":
+        print("Dibatalkan.")
+        return
+
+    paket = paket.drop(nomor)                              
+    simpan(paket, FILE_PAKET)
+    print("Paket berhasil dihapus!")
+
+
+#fitur" kelola paket
+def menu_paket():
+    selesai = False
+    while not selesai:
+        judul("KELOLA PAKET")
+        print("[1] Lihat Paket")
+        print("[2] Tambah Paket")
+        print("[3] Ubah Paket")
+        print("[4] Hapus Paket")
+        print("[5] Kembali")
+        pilihan = input("Pilih menu: ").strip()
+
+        if pilihan == "1":
+            tampil_paket(baca(FILE_PAKET))
+        elif pilihan == "2":
+            tambah_paket()
+        elif pilihan == "3":
+            ubah_paket()
+        elif pilihan == "4":
+            hapus_paket()
+        elif pilihan == "5":
+            selesai = True
+        else:
+            print("Pilihan tidak valid!")
