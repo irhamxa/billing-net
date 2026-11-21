@@ -11,10 +11,16 @@ FILE_PEMBAYARAN = "data/pembayaran.csv"
 HEADER_ADMIN = ("username", "password")
 HEADER_PAKET = ("id_paket", "nama_paket", "harga")
 HEADER_PELANGGAN = ("id_pelanggan", "username", "password", "nama",
-                    "alamat", "no_hp", "id_paket", "tanggal_daftar")
+                    "alamat", "no_hp", "id_paket", "tanggal_daftar", "tanggal_berakhir")
 HEADER_PEMBAYARAN = ("id_tagihan", "id_pelanggan", "bulan", "tahun",
                      "id_paket", "nominal", "status", "tanggal_b"
                      "ayar")
+
+MASA_AKTIF = 30 
+HARI_TAGIHAN = 7
+BATAS_TELAT = 10  
+
+
 # buat file kalau belum ada
 def buat_file(namafile, header, isi):
     if not os.path.exists(namafile):
