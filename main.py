@@ -18,9 +18,9 @@ HEADER_PEMBAYARAN = ("id_tagihan", "id_pelanggan", "bulan", "tahun",
 # buat file kalau belum ada
 def buat_file(namafile, header, isi):
     if not os.path.exists(namafile):
-        with open(namafile, "w") as file:                 
+        with open(namafile, "w") as file:
             file.write(",".join(header) + "\n")
-        with open(namafile, "a") as file:                 
+        with open(namafile, "a") as file:
             for baris in isi:
                 file.write(baris + "\n")
 
@@ -28,7 +28,6 @@ def buat_file(namafile, header, isi):
 def buat_file_awal():
     if not os.path.exists(FOLDER):
         os.makedirs(FOLDER)
-
 
     admin_awal = ["admin,admin123"]
     paket_awal = ["PKT01,Paket 10 Mbps,100000",
@@ -40,7 +39,8 @@ def buat_file_awal():
     buat_file(FILE_PELANGGAN, HEADER_PELANGGAN, [])
     buat_file(FILE_PEMBAYARAN, HEADER_PEMBAYARAN, [])
 
-#fungsi baca csv jadi dataframe
+
+# fungsi baca csv jadi dataframe
 def baca(namafile):
     try:
         return pd.read_csv(namafile, dtype=str)
@@ -49,14 +49,14 @@ def baca(namafile):
         buat_file_awal()
         return pd.read_csv(namafile, dtype=str)
 
-#fungsi simpan df ke csv
+
+# fungsi simpan df ke csv
 def simpan(df, namafile):
     df.to_csv(namafile, index=False)
 
 
-
-def garis():
-    print("-" * 70)
+def garis(panjang=70):
+    print("-" * panjang)
 
 
 def judul(teks):
@@ -70,7 +70,17 @@ def format_rupiah(angka):
     teks = f"{angka:,}".replace(",", ".")
     return "Rp" + teks
 
-#fungsi pilihan fitur
+
+# input yang tidak boleh kosong
+def input_wajib(pertanyaan):
+    while True:
+        nilai = input(pertanyaan).strip()
+        if nilai != "":
+            return nilai
+        print("Input tidak boleh kosong!")
+
+
+# fungsi pilihan fitur
 def pilih_nomor(pertanyaan, jumlah):
     pilihan = input(pertanyaan).strip()
     if pilihan.isdigit() and 1 <= int(pilihan) <= jumlah:
@@ -78,16 +88,18 @@ def pilih_nomor(pertanyaan, jumlah):
     print("Pilihan tidak valid!")
     return -1
 
-#fungsi genberate id
+
+# fungsi generate id
 def buat_id(awalan, df, kolom):
     nomor_max = 0
     for id_lama in df[kolom]:
-        angka = id_lama[len(awalan):]                     
+        angka = id_lama[len(awalan):]
         if angka.isdigit() and int(angka) > nomor_max:
             nomor_max = int(angka)
     return awalan + str(nomor_max + 1).zfill(2)
 
-#fungsi id pelanggan
+
+# fungsi id pelanggan (riwayat bayar pelanggan yang sudah dihapus ikut dicek)
 def buat_id_pelanggan(pelanggan):
     bayar = baca(FILE_PEMBAYARAN)
     nomor_max = 0
@@ -104,19 +116,46 @@ def waktu_sekarang():
     tanggal = sekarang.strftime("%Y-%m-%d")
     return tanggal, str(sekarang.month), str(sekarang.year)   # tuple
 
-#cari baris pertama yang isinya cocok
+
+# tanggal hari ini (bentuk date, bisa dihitung selisihnya)
+def hari_ini():
+    return datetime.now().date()
+
+
+# ubah teks "2026-11-20" jadi date
+def ke_tanggal(teks):
+    if teks == "-":
+        return hari_ini()
+    return datetime.strptime(teks, "%Y-%m-%d").date()
+
+
+# sisa hari masa aktif. 0 atau negatif = masa aktif sudah habis
+def hitung_sisa_hari(teks):
+    return (ke_tanggal(teks) - hari_ini()).days
+
+
+# cari baris pertama yang isinya cocok
 def cari_index(df, kolom, nilai):
     for i in range(len(df)):
         if df.iloc[i][kolom] == nilai:
             return i
     return -1
 
-#tambah data
+
+# tambah data
 def tambah_baris(df, baris):
     baru = pd.DataFrame([baris])
     if len(df) == 0:
         return baru
     return pd.concat([df, baru], ignore_index=True)
+
+
+def ambil_nama_paket(id_paket):
+    paket = baca(FILE_PAKET)
+    k = cari_index(paket, "id_paket", id_paket)
+    if k == -1:
+        return "-"
+    return paket.iloc[k]["nama_paket"]
 
 
 def tampil_paket(paket):
@@ -130,37 +169,45 @@ def tampil_paket(paket):
     garis()
 
 
-def buat_tagihan_bulan_ini(id_pel):
-    tanggal, bulan, tahun = waktu_sekarang()
-    bayar = baca(FILE_PEMBAYARAN)
 
-    for i in range(len(bayar)):
-        if (bayar.iloc[i]["id_pelanggan"] == id_pel and
-                bayar.iloc[i]["bulan"] == bulan and
-                bayar.iloc[i]["tahun"] == tahun):
-            return                                         
-
+def buat_tagihan(id_pel):
     pelanggan = baca(FILE_PELANGGAN)
-    paket = baca(FILE_PAKET)
     p = cari_index(pelanggan, "id_pelanggan", id_pel)
-    id_paket = pelanggan.iloc[p]["id_paket"]
-    k = cari_index(paket, "id_paket", id_paket)
-    harga = paket.iloc[k]["harga"]
+    if p == -1:
+        return
 
+    id_paket = pelanggan.iloc[p]["id_paket"]
+    if id_paket == "-":
+        return
+    if hitung_sisa_hari(pelanggan.iloc[p]["tanggal_berakhir"]) > HARI_TAGIHAN:
+        return
+
+    bayar = baca(FILE_PEMBAYARAN)
+    for i in range(len(bayar)):
+        if bayar.iloc[i]["id_pelanggan"] == id_pel and bayar.iloc[i]["status"] == "Belum Lunas":
+            return
+
+    paket = baca(FILE_PAKET)
+    k = cari_index(paket, "id_paket", id_paket)
+    if k == -1:
+        return
+
+    tanggal, bulan, tahun = waktu_sekarang()
     tagihan = {
         "id_tagihan": buat_id("TGH", bayar, "id_tagihan"),
         "id_pelanggan": id_pel,
         "bulan": bulan,
         "tahun": tahun,
         "id_paket": id_paket,
-        "nominal": harga,
+        "nominal": paket.iloc[k]["harga"],
         "status": "Belum Lunas",
         "tanggal_bayar": "-",
     }
     bayar = tambah_baris(bayar, tagihan)
     simpan(bayar, FILE_PEMBAYARAN)
 
-#hapus data pelanggan
+
+# hapus akun pelanggan + tagihan yang belum lunas (riwayat lunas tetap disimpan)
 def hapus_data_pelanggan(id_pel):
     pelanggan = baca(FILE_PELANGGAN)
     bayar = baca(FILE_PEMBAYARAN)
@@ -170,6 +217,19 @@ def hapus_data_pelanggan(id_pel):
     simpan(pelanggan, FILE_PELANGGAN)
     simpan(bayar, FILE_PEMBAYARAN)
 
+
+# hentikan langganan
+def hentikan_langganan(id_pel):
+    pelanggan = baca(FILE_PELANGGAN)
+    p = cari_index(pelanggan, "id_pelanggan", id_pel)
+    pelanggan.at[p, "id_paket"] = "-"
+    pelanggan.at[p, "tanggal_berakhir"] = "-"
+    simpan(pelanggan, FILE_PELANGGAN)
+
+    bayar = baca(FILE_PEMBAYARAN)
+    bayar = bayar[~((bayar["id_pelanggan"] == id_pel) &
+                    (bayar["status"] == "Belum Lunas"))]
+    simpan(bayar, FILE_PEMBAYARAN)
 #FITUR PELANGGAN
 
 #regristasi akun dan langganan
