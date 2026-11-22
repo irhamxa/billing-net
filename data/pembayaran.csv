@@ -1,2 +1,1 @@
 id_tagihan,id_pelanggan,bulan,tahun,id_paket,nominal,status,tanggal_bayar
-TGH01,PLG01,11,2026,PKT03,200000,Lunas,2026-11-18
