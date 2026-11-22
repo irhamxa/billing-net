@@ -595,7 +595,7 @@ def menu_pelanggan(id_pel):
 
 # FITUR ADMIN
 
-#login admin
+# login admin
 def login_admin():
     judul("LOGIN ADMIN")
     username = input("Username: ").strip().lower()
@@ -611,13 +611,13 @@ def login_admin():
     return ""
 
 
-#fungsi ganti password
+# fungsi ganti password
 def ganti_password_admin(username):
     judul("GANTI PASSWORD ADMIN")
     admin = baca(FILE_ADMIN)
     i = cari_index(admin, "username", username)
 
-    lama = input("Password lama: ").strip().lower()
+    lama = input("Password lama: ").strip()
     if lama != admin.iloc[i]["password"]:
         print("Password lama salah!")
         return
@@ -631,11 +631,12 @@ def ganti_password_admin(username):
     simpan(admin, FILE_ADMIN)
     print("Password admin berhasil diubah!")
 
-#tambah paket
+
+# tambah paket
 def tambah_paket():
     judul("TAMBAH PAKET")
     paket = baca(FILE_PAKET)
-    nama = input("Nama paket: ").strip().title()
+    nama = input_wajib("Nama paket: ").title()
 
     while True:
         harga = input("Harga per bulan (angka): ").strip()
@@ -650,7 +651,7 @@ def tambah_paket():
     print("Paket berhasil ditambahkan dengan ID:", id_baru)
 
 
-#ubah paket
+# ubah paket
 def ubah_paket():
     judul("UBAH PAKET")
     paket = baca(FILE_PAKET)
@@ -675,7 +676,7 @@ def ubah_paket():
     print("Paket berhasil diperbarui!")
 
 
-#hapus paket
+# hapus paket
 def hapus_paket():
     judul("HAPUS PAKET")
     paket = baca(FILE_PAKET)
@@ -695,12 +696,12 @@ def hapus_paket():
         print("Dibatalkan.")
         return
 
-    paket = paket.drop(nomor)                              
+    paket = paket.drop(nomor)
     simpan(paket, FILE_PAKET)
     print("Paket berhasil dihapus!")
 
 
-#fitur" kelola paket
+# fitur kelola paket
 def menu_paket():
     selesai = False
     while not selesai:
