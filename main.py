@@ -874,4 +874,212 @@ def rekap_pendapatan():
     else:
         print("Total tahun", pilih_tahun)
     print("Jumlah transaksi :", total_transaksi)
-    print("Total pendapatan :", format_rupiah(total_uang))
+    print("Total pendapatan :", format_rupiah(total_uang)) 
+
+    # tampilkan detail satu pelanggan
+def tampil_detail_pelanggan(id_pel):
+    buat_tagihan(id_pel)
+    pelanggan = baca(FILE_PELANGGAN)
+    bayar = baca(FILE_PEMBAYARAN)
+    i = cari_index(pelanggan, "id_pelanggan", id_pel)
+
+    print("\n" + "#" * 70)
+    print("ID            :", id_pel)
+    print("Username      :", pelanggan.iloc[i]["username"])
+    print("Password      :", pelanggan.iloc[i]["password"])
+    print("Nama          :", pelanggan.iloc[i]["nama"])
+    print("Alamat        :", pelanggan.iloc[i]["alamat"])
+    print("No HP         :", pelanggan.iloc[i]["no_hp"])
+    print("Paket         :", ambil_nama_paket(pelanggan.iloc[i]["id_paket"]))
+    print("Aktif sampai  :", pelanggan.iloc[i]["tanggal_berakhir"])
+    print("Tgl Daftar    :", pelanggan.iloc[i]["tanggal_daftar"])
+
+    print("\nStatus & riwayat pembayaran:")
+    ada_tagihan = False
+    ada_belum = False
+    for j in range(len(bayar)):
+        if bayar.iloc[j]["id_pelanggan"] == id_pel:
+            ada_tagihan = True
+            if bayar.iloc[j]["status"] == "Belum Lunas":
+                ada_belum = True
+            print(f"  {bayar.iloc[j]['id_tagihan']} | "
+                  f"{bayar.iloc[j]['bulan']}/{bayar.iloc[j]['tahun']} | "
+                  f"{format_rupiah(bayar.iloc[j]['nominal'])} | "
+                  f"{bayar.iloc[j]['status']} | {bayar.iloc[j]['tanggal_bayar']}")
+    if not ada_tagihan:
+        print("  Belum ada tagihan.")
+
+    # keterangan telat
+    if pelanggan.iloc[i]["id_paket"] != "-" and ada_belum:
+        telat = -hitung_sisa_hari(pelanggan.iloc[i]["tanggal_berakhir"])
+        if telat >= BATAS_TELAT:
+            print("\n>> Telat bayar", telat, "hari! Tentukan: dimatikan atau diteruskan.")
+
+
+# admin menghentikan paket pelanggan
+def berhentikan_pelanggan(id_pel):
+    pelanggan = baca(FILE_PELANGGAN)
+    p = cari_index(pelanggan, "id_pelanggan", id_pel)
+
+    if pelanggan.iloc[p]["id_paket"] == "-":
+        print("Pelanggan ini sedang tidak berlangganan.")
+        return
+
+    print("Paket pelanggan:", ambil_nama_paket(pelanggan.iloc[p]["id_paket"]))
+    print("Paket pelanggan akan dihentikan. Akun pelanggan tetap ada.")
+    konfirmasi = input("Yakin berhentikan pelanggan ini? (y/n): ").strip().lower()
+    if konfirmasi != "y":
+        print("Dibatalkan.")
+        return
+
+    hentikan_langganan(id_pel)
+    print("Paket pelanggan berhasil dihentikan!")
+
+
+#hapus akun pelanggan.
+def hapus_pelanggan_admin(id_pel):
+    print("Akun pelanggan akan dihapus permanen.")
+    print("(Riwayat pembayaran yang sudah lunas tetap diarsipkan untuk rekap pendapatan.)")
+    konfirmasi = input("Yakin hapus pelanggan ini? (y/n): ").strip().lower()
+    if konfirmasi != "y":
+        print("Dibatalkan.")
+        return False
+
+    hapus_data_pelanggan(id_pel)
+    print("Pelanggan berhasil dihapus!")
+    return True
+
+
+# cari pelanggan
+def cari_pelanggan():
+    judul("CARI PELANGGAN")
+    kata = input("Cari nama / username: ").strip().lower()
+    pelanggan = baca(FILE_PELANGGAN)
+
+    hasil = []                                   # index pelanggan yang cocok
+    for i in range(len(pelanggan)):
+        nama = pelanggan.iloc[i]["nama"]
+        user = pelanggan.iloc[i]["username"]
+        if kata in nama.lower() or kata in user.lower():
+            hasil.append(i)
+
+    if len(hasil) == 0:
+        print("Pelanggan tidak ditemukan.")
+        return
+
+    nomor = 0
+    if len(hasil) > 1:                           
+        print("Ditemukan", len(hasil), "pelanggan:")
+        for no in range(len(hasil)):
+            i = hasil[no]
+            print(f"[{no + 1}] {pelanggan.iloc[i]['id_pelanggan']} | "
+                  f"{pelanggan.iloc[i]['nama']} | {pelanggan.iloc[i]['username']}")
+        nomor = pilih_nomor("Pilih nomor pelanggan: ", len(hasil))
+        if nomor == -1:
+            return
+
+    id_pel = pelanggan.iloc[hasil[nomor]]["id_pelanggan"]
+
+    selesai = False
+    while not selesai:
+        tampil_detail_pelanggan(id_pel)
+        print("\n[1] Berhentikan Pelanggan")
+        print("[2] Hapus Pelanggan")
+        print("[3] Keluar")
+        pilihan = input("Pilih menu: ").strip()
+
+        if pilihan == "1":
+            berhentikan_pelanggan(id_pel)
+        elif pilihan == "2":
+            if hapus_pelanggan_admin(id_pel):
+                selesai = True                   
+        elif pilihan == "3":
+            selesai = True
+        else:
+            print("Pilihan tidak valid!")
+
+
+# menu admin
+def menu_admin(username):
+    aktif = True
+    while aktif:
+        judul("MENU ADMIN")
+        print("[1] Kelola Paket")
+        print("[2] Daftar Semua Pelanggan")
+        print("[3] Status Pembayaran Pelanggan (Lunas / Belum Lunas)")
+        print("[4] Cari Pelanggan (Berhentikan / Hapus)")
+        print("[5] Rekap Pendapatan")
+        print("[6] Ganti Password Admin")
+        print("[7] Logout")
+        pilihan = input("Pilih menu: ").strip()
+
+        if pilihan == "1":
+            menu_paket()
+        elif pilihan == "2":
+            lihat_semua_pelanggan()
+        elif pilihan == "3":
+            status_pembayaran()
+        elif pilihan == "4":
+            cari_pelanggan()
+        elif pilihan == "5":
+            rekap_pendapatan()
+        elif pilihan == "6":
+            ganti_password_admin(username)
+        elif pilihan == "7":
+            print("Admin logout.")
+            aktif = False
+        else:
+            print("Pilihan tidak valid!")
+
+
+# NAVIGASI UTAMA
+
+# submenu login: admin / pelanggan
+def menu_login():
+    kembali = False
+    while not kembali:
+        judul("LOGIN")
+        print("[1] Admin")
+        print("[2] Pelanggan")
+        print("[3] Kembali")
+        pilihan = input("Pilih menu: ").strip()
+
+        if pilihan == "1":
+            username = login_admin()
+            if username != "":
+                menu_admin(username)
+                kembali = True
+        elif pilihan == "2":
+            id_pel = login_pelanggan()
+            if id_pel != "":
+                menu_pelanggan(id_pel)
+                kembali = True
+        elif pilihan == "3":
+            kembali = True
+        else:
+            print("Pilihan tidak valid!")
+
+
+def main():
+    buat_file_awal()
+    berjalan = True
+
+    while berjalan:
+        judul("BILLING NET - RT/RW NET")
+        print("[1] Registrasi Pelanggan")
+        print("[2] Login")
+        print("[3] Keluar")
+        pilihan = input("Pilih menu: ").strip()
+
+        if pilihan == "1":
+            registrasi()
+        elif pilihan == "2":
+            menu_login()
+        elif pilihan == "3":
+            print("Terima kasih telah menggunakan Billing Net!")
+            berjalan = False
+        else:
+            print("Pilihan tidak valid!")
+
+
+main()
