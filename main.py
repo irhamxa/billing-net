@@ -507,12 +507,12 @@ def ganti_paket(id_pel):
     print("Paket berhasil diganti ke", paket.iloc[nomor]["nama_paket"])
 
 
-#fungsi bayar tagihan
+# fungsi bayar tagihan
 def bayar_tagihan(id_pel):
     judul("BAYAR TAGIHAN")
     bayar = baca(FILE_PEMBAYARAN)
 
-    daftar = []                                            
+    daftar = []
     for i in range(len(bayar)):
         if bayar.iloc[i]["id_pelanggan"] == id_pel and bayar.iloc[i]["status"] == "Belum Lunas":
             daftar.append(i)
@@ -541,53 +541,186 @@ def bayar_tagihan(id_pel):
     bayar.at[i, "status"] = "Lunas"
     bayar.at[i, "tanggal_bayar"] = tanggal
     simpan(bayar, FILE_PEMBAYARAN)
+
+    # perpanjang masa aktif 30 hari
+    pelanggan = baca(FILE_PELANGGAN)
+    p = cari_index(pelanggan, "id_pelanggan", id_pel)
+    berakhir_lama = ke_tanggal(pelanggan.iloc[p]["tanggal_berakhir"])
+    berakhir_baru = berakhir_lama + timedelta(days=MASA_AKTIF)
+    pelanggan.at[p, "tanggal_berakhir"] = berakhir_baru.strftime("%Y-%m-%d")
+    simpan(pelanggan, FILE_PELANGGAN)
+
     print("Pembayaran berhasil! Status: Lunas,", tanggal)
+    print("Jatuh tempo berikutnya:", berakhir_baru.strftime("%Y-%m-%d"))
+    if berakhir_baru <= hari_ini():
+        print("Masih ada tagihan periode berikutnya, cek menu Lihat Tagihan.")
+
+# upgrade / ganti paket
+def ganti_paket(id_pel):
+    judul("UPGRADE / GANTI PAKET")
+    pelanggan = baca(FILE_PELANGGAN)
+    paket = baca(FILE_PAKET)
+    p = cari_index(pelanggan, "id_pelanggan", id_pel)
+
+    id_lama = pelanggan.iloc[p]["id_paket"]
+    if id_lama == "-":
+        print("Anda belum berlangganan. Silakan pilih paket di menu Pilih Paket.")
+        return
+
+    berakhir = pelanggan.iloc[p]["tanggal_berakhir"]
+    sisa = hitung_sisa_hari(berakhir)
+    if sisa > 0:
+        print("Paket belum bisa diganti!")
+        print("Masa aktif paket Anda sampai", berakhir, f"({sisa} hari lagi).")
+        print("Paket baru bisa diganti setelah masa aktif habis dan sebelum")
+        print("membayar perpanjangan.")
+        return
+
+    tampil_paket(paket)
+    print("Paket Anda sekarang:", ambil_nama_paket(id_lama))
+    nomor = pilih_nomor("Pilih nomor paket baru: ", len(paket))
+    if nomor == -1:
+        return
+
+    id_baru = paket.iloc[nomor]["id_paket"]
+    harga_baru = paket.iloc[nomor]["harga"]
+    if id_baru == id_lama:
+        print("Anda sudah memakai paket ini.")
+        return
+
+    pelanggan.at[p, "id_paket"] = id_baru
+    simpan(pelanggan, FILE_PELANGGAN)
+
+    # tagihan yang belum lunas ikut pindah ke paket baru
+    bayar = baca(FILE_PEMBAYARAN)
+    for i in range(len(bayar)):
+        if bayar.iloc[i]["id_pelanggan"] == id_pel and bayar.iloc[i]["status"] == "Belum Lunas":
+            bayar.at[i, "id_paket"] = id_baru
+            bayar.at[i, "nominal"] = harga_baru
+    simpan(bayar, FILE_PEMBAYARAN)
+    buat_tagihan(id_pel)        
+
+    print("Paket berhasil diganti ke", paket.iloc[nomor]["nama_paket"])
+    print("Tagihan perpanjangan sudah disesuaikan. Bayar di menu Lihat Tagihan.")
 
 
-#berhenti langganan
+# berhenti langganan
 def berhenti_langganan(id_pel):
     judul("BERHENTI LANGGANAN")
-    print("Akun dan tagihan yang belum lunas akan dihapus permanen!")
+    pelanggan = baca(FILE_PELANGGAN)
+    p = cari_index(pelanggan, "id_pelanggan", id_pel)
+
+    if pelanggan.iloc[p]["id_paket"] == "-":
+        print("Anda belum berlangganan paket apa pun.")
+        return
+
+    sisa = hitung_sisa_hari(pelanggan.iloc[p]["tanggal_berakhir"])
+    print("Paket Anda:", ambil_nama_paket(pelanggan.iloc[p]["id_paket"]))
+    if sisa > 0:
+        print("Sisa masa aktif", sisa, "hari akan hangus (tidak ada pengembalian dana).")
+    print("Paket Anda akan dihentikan.")
+    print("Akun Anda tetap ada, bisa berlangganan lagi kapan saja.")
+    konfirmasi = input("Yakin berhenti berlangganan? (y/n): ").strip().lower()
+    if konfirmasi != "y":
+        print("Dibatalkan.")
+        return
+
+    hentikan_langganan(id_pel)
+    print("Langganan berhasil dihentikan. Terima kasih!")
+
+
+# submenu
+def menu_layanan(id_pel):
+    kembali = False
+    while not kembali:
+        judul("LAYANAN")
+        print("[1] Pilih Paket")
+        print("[2] Upgrade Paket")
+        print("[3] Berhenti Langganan")
+        print("[4] Kembali")
+        pilihan = input("Pilih menu: ").strip()
+
+        if pilihan == "1":
+            pilih_paket(id_pel)
+        elif pilihan == "2":
+            ganti_paket(id_pel)
+        elif pilihan == "3":
+            berhenti_langganan(id_pel)
+        elif pilihan == "4":
+            kembali = True
+        else:
+            print("Pilihan tidak valid!")
+
+
+# ganti password pelanggan
+def ganti_password(id_pel):
+    judul("GANTI PASSWORD")
+    pelanggan = baca(FILE_PELANGGAN)
+    i = cari_index(pelanggan, "id_pelanggan", id_pel)
+
+    lama = input("Password lama: ").strip()
+    if lama != pelanggan.iloc[i]["password"]:
+        print("Password lama salah!")
+        return
+
+    baru = input("Password baru (min 6 karakter): ").strip()
+    if len(baru) < 6 or baru == lama:
+        print("Password baru minimal 6 karakter dan tidak boleh sama dengan yang lama!")
+        return
+
+    pelanggan.at[i, "password"] = baru
+    simpan(pelanggan, FILE_PELANGGAN)
+    print("Password berhasil diubah!")
+
+# hapus akun pelanggan (harus berhenti langganan dulu)
+def hapus_akun(id_pel):
+    judul("HAPUS AKUN")
+    pelanggan = baca(FILE_PELANGGAN)
+    p = cari_index(pelanggan, "id_pelanggan", id_pel)
+
+    if pelanggan.iloc[p]["id_paket"] != "-":
+        print("Akun belum bisa dihapus karena Anda masih berlangganan.")
+        print("Berhenti langganan dulu di menu Layanan.")
+        return False
+
+    print("Akun Anda akan dihapus permanen dan tidak bisa dikembalikan.")
     print("(Riwayat pembayaran yang sudah lunas tetap diarsipkan.)")
-    konfirmasi = input("Yakin berhenti? (y/n): ").strip().lower()
+    password = input("Masukkan password untuk konfirmasi: ").strip()
+    if password != pelanggan.iloc[p]["password"]:
+        print("Password salah! Penghapusan dibatalkan.")
+        return False
+
+    konfirmasi = input("Yakin hapus akun? (y/n): ").strip().lower()
     if konfirmasi != "y":
         print("Dibatalkan.")
         return False
 
     hapus_data_pelanggan(id_pel)
-    print("Akun berhasil dihapus. Terima kasih telah berlangganan!")
+    print("Akun berhasil dihapus. Terima kasih!")
     return True
 
-
-#navigasi pelanggan
+# navigasi pelanggan
 def menu_pelanggan(id_pel):
-    buat_tagihan_bulan_ini(id_pel)                         
     aktif = True
     while aktif:
         judul("MENU PELANGGAN")
         print("[1] Lihat Tagihan")
-        print("[2] Bayar Tagihan")
-        print("[3] Riwayat Pembayaran")
-        print("[4] Upgrade / Ganti Paket")
-        print("[5] Ganti Password")
-        print("[6] Berhenti Langganan")
-        print("[7] Logout")
+        print("[2] Layanan")
+        print("[3] Ganti Password")
+        print("[4] Hapus Akun")
+        print("[5] Logout")
         pilihan = input("Pilih menu: ").strip()
 
         if pilihan == "1":
-            lihat_tagihan(id_pel)
+            menu_tagihan(id_pel)
         elif pilihan == "2":
-            bayar_tagihan(id_pel)
+            menu_layanan(id_pel)
         elif pilihan == "3":
-            riwayat_pembayaran(id_pel)
-        elif pilihan == "4":
-            ganti_paket(id_pel)
-        elif pilihan == "5":
             ganti_password(id_pel)
-        elif pilihan == "6":
-            if berhenti_langganan(id_pel):
+        elif pilihan == "4":
+            if hapus_akun(id_pel):
                 aktif = False
-        elif pilihan == "7":
+        elif pilihan == "5":
             print("Anda sudah logout.")
             aktif = False
         else:
